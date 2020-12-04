@@ -64,7 +64,7 @@ static void zlog_clean_rest_thread(void)
 	return;
 }
 
-static int zlog_init_inner(const char *confpath)
+static int zlog_init_inner(const char *config)
 {
 	int rc = 0;
 
@@ -88,9 +88,9 @@ static int zlog_init_inner(const char *confpath)
 		zlog_env_init_version++;
 	} /* else maybe after zlog_fini() and need not create pthread_key */
 
-	zlog_env_conf = zlog_conf_new(confpath);
+	zlog_env_conf = zlog_conf_new(config);
 	if (!zlog_env_conf) {
-		zc_error("zlog_conf_new[%s] fail", confpath);
+		zc_error("zlog_conf_new[%s] fail", config);
 		goto err;
 	}
 
@@ -113,7 +113,7 @@ err:
 }
 
 /*******************************************************************************/
-int zlog_init(const char *confpath)
+int zlog_init(const char *config)
 {
 	int rc;
 	zc_debug("------zlog_init start------");
@@ -131,8 +131,8 @@ int zlog_init(const char *confpath)
 	}
 
 
-	if (zlog_init_inner(confpath)) {
-		zc_error("zlog_init_inner[%s] fail", confpath);
+	if (zlog_init_inner(config)) {
+		zc_error("zlog_init_inner[%s] fail", config);
 		goto err;
 	}
 
@@ -156,7 +156,7 @@ err:
 	return -1;
 }
 
-int dzlog_init(const char *confpath, const char *cname)
+int dzlog_init(const char *config, const char *cname)
 {
 	int rc = 0;
 	zc_debug("------dzlog_init start------");
@@ -174,8 +174,8 @@ int dzlog_init(const char *confpath, const char *cname)
 		goto err;
 	}
 
-	if (zlog_init_inner(confpath)) {
-		zc_error("zlog_init_inner[%s] fail", confpath);
+	if (zlog_init_inner(config)) {
+		zc_error("zlog_init_inner[%s] fail", config);
 		goto err;
 	}
 
@@ -208,7 +208,7 @@ err:
 	return -1;
 }
 /*******************************************************************************/
-int zlog_reload(const char *confpath)
+int zlog_reload(const char *config)
 {
 	int rc = 0;
 	int i = 0;
@@ -229,13 +229,13 @@ int zlog_reload(const char *confpath)
 	}
 
 	/* use last conf file */
-	if (confpath == NULL) confpath = zlog_env_conf->file;
+	if (config == NULL) config = zlog_env_conf->file;
 
 	/* reach reload period */
-	if (confpath == (char*)-1) {
+	if (config == (char*)-1) {
 		/* test again, avoid other threads already reloaded */
 		if (zlog_env_reload_conf_count > zlog_env_conf->reload_conf_period) {
-			confpath = zlog_env_conf->file;
+			config = zlog_env_conf->file;
 		} else {
 			/* do nothing, already done */
 			goto quit;
@@ -245,7 +245,7 @@ int zlog_reload(const char *confpath)
 	/* reset counter, whether automaticlly or mannually */
 	zlog_env_reload_conf_count = 0;
 
-	new_conf = zlog_conf_new(confpath);
+	new_conf = zlog_conf_new(config);
 	if (!new_conf) {
 		zc_error("zlog_conf_new fail");
 		goto err;
@@ -309,7 +309,7 @@ void zlog_fini(void)
 	}
 
 	if (!zlog_env_is_init) {
-		zc_error("before finish, must zlog_init() or dzlog_init() fisrt");
+		zc_error("before finish, must zlog_init() or dzlog_init() first");
 		goto exit;
 	}
 
@@ -609,6 +609,17 @@ exit:
 	return;
 }
 
+int zlog_level_switch(zlog_category_t * category, int level)
+{
+    // This is NOT thread safe.
+    memset(category->level_bitmap, 0x00, sizeof(category->level_bitmap));
+    category->level_bitmap[level / 8] |= ~(0xFF << (8 - level % 8));
+    memset(category->level_bitmap + level / 8 + 1, 0xFF,
+	    sizeof(category->level_bitmap) -  level / 8 - 1);
+
+    return 0;
+}
+
 /*******************************************************************************/
 void vzlog(zlog_category_t * category,
 	const char *file, size_t filelen,
@@ -625,7 +636,7 @@ void vzlog(zlog_category_t * category,
 	 * but it is safe, the bitmap is valid as long as category exist,
 	 * And will be the right value after zlog_reload()
 	 *
-	 * For speed up, if one log will not be ouput,
+	 * For speed up, if one log will not be output,
 	 * There is no need to aquire rdlock.
 	 */
 	if (zlog_category_needless_level(category, level)) return;
@@ -1003,6 +1014,11 @@ int zlog_set_record(const char *rname, zlog_record_fn record_output)
 		return -1;
 	}
 	return rc;
+}
+/*******************************************************************************/
+int zlog_level_enabled(zlog_category_t *category, const int level)
+{
+	return category && (zlog_category_needless_level(category, level) == 0);
 }
 
 const char *zlog_version(void) { return ZLOG_VERSION; }

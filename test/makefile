@@ -4,6 +4,7 @@ exe = 		\
 	test_buf	\
 	test_bitmap	\
 	test_conf	\
+	test_conf2  \
 	test_hashtable	\
 	test_hello	\
 	test_hex	\
@@ -11,6 +12,7 @@ exe = 		\
 	test_level	\
 	test_leak	\
 	test_mdc	\
+	test_multithread	\
 	test_record	\
 	test_pipe	\
 	test_press_zlog		\
@@ -19,8 +21,11 @@ exe = 		\
 	test_press_write2	\
 	test_press_syslog	\
 	test_syslog	\
-	test_default \
-	test_profile
+	test_default	\
+	test_profile	\
+	test_category   \
+	test_prompt	\
+	test_enabled
 
 all     :       $(exe)
 
